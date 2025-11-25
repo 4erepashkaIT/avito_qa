@@ -1,24 +1,13 @@
-"""
-Конфигурация pytest и фикстуры для API тестов Avito QA Internship.
-
-ВАЖНО: API ожидает поля статистики (likes, viewCount, contacts) на ВЕРХНЕМ уровне JSON,
-а НЕ внутри объекта statistics, как указано в документации Postman.
-Это расхождение задокументировано в BUG-001.
-"""
 import pytest
 import requests
 import random
 import time
 from typing import Generator, Dict, Any, List
 
-
-# ===================== КОНСТАНТЫ =====================
 BASE_URL = "https://qa-internship.avito.com"
 SELLER_ID_MIN = 111111
 SELLER_ID_MAX = 999999
 
-
-# ===================== ХЕЛПЕРЫ =====================
 class APIClient:
     """Клиент для работы с API Avito."""
     
@@ -84,8 +73,6 @@ def create_valid_item_data(seller_id: int = None, name: str = "Тестовый 
         "contacts": contacts
     }
 
-
-# ===================== ФИКСТУРЫ =====================
 @pytest.fixture(scope="session")
 def api_client() -> Generator[APIClient, None, None]:
     """Фикстура для создания API клиента на всю сессию."""
@@ -155,8 +142,6 @@ def multiple_items(api_client: APIClient, unique_seller_id: int) -> Generator[Li
         except Exception:
             pass
 
-
-# ===================== PYTEST HOOKS =====================
 def pytest_configure(config):
     """Добавление маркеров."""
     config.addinivalue_line("markers", "positive: Позитивные тест-кейсы")
