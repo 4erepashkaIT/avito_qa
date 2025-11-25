@@ -1,5 +1,9 @@
 """
 Конфигурация pytest и фикстуры для API тестов Avito QA Internship.
+
+ВАЖНО: API ожидает поля статистики (likes, viewCount, contacts) на ВЕРХНЕМ уровне JSON,
+а НЕ внутри объекта statistics, как указано в документации Postman.
+Это расхождение задокументировано в BUG-001.
 """
 import pytest
 import requests
@@ -48,9 +52,10 @@ class APIClient:
 
 
 def generate_unique_seller_id() -> int:
-    """Генерация уникального sellerID с использованием timestamp."""
-    timestamp = int(time.time() * 1000) % 888888  # Получаем остаток от деления
-    return SELLER_ID_MIN + timestamp
+    """Генерация уникального sellerID с использованием timestamp и random."""
+    timestamp = int(time.time() * 1000) % 800000
+    random_part = random.randint(0, 88888)
+    return SELLER_ID_MIN + (timestamp + random_part) % 888888
 
 
 def generate_random_seller_id() -> int:
@@ -58,22 +63,26 @@ def generate_random_seller_id() -> int:
     return random.randint(SELLER_ID_MIN, SELLER_ID_MAX)
 
 
-def create_valid_item_data(seller_id: int = None, **kwargs) -> Dict[str, Any]:
-    """Создание валидных данных для объявления."""
+def create_valid_item_data(seller_id: int = None, name: str = "Тестовый товар", 
+                           price: int = 1000, likes: int = 0, 
+                           view_count: int = 0, contacts: int = 0) -> Dict[str, Any]:
+    """
+    Создание валидных данных для объявления.
+    
+    ВАЖНО: Поля likes, viewCount, contacts должны быть на ВЕРХНЕМ уровне JSON!
+    Это реальный формат API (расхождение с документацией Postman - см. BUG-001).
+    """
     if seller_id is None:
         seller_id = generate_unique_seller_id()
     
-    data = {
+    return {
         "sellerID": seller_id,
-        "name": kwargs.get("name", "Тестовый товар"),
-        "price": kwargs.get("price", 1000),
-        "statistics": kwargs.get("statistics", {
-            "likes": 0,
-            "viewCount": 0,
-            "contacts": 0
-        })
+        "name": name,
+        "price": price,
+        "likes": likes,
+        "viewCount": view_count,
+        "contacts": contacts
     }
-    return data
 
 
 # ===================== ФИКСТУРЫ =====================
@@ -108,22 +117,20 @@ def created_item(api_client: APIClient, unique_seller_id: int) -> Generator[Dict
     assert response.status_code == 200, f"Не удалось создать объявление: {response.text}"
     
     created = response.json()
-    created["_request_data"] = item_data  # Сохраняем исходные данные для проверки
+    created["_request_data"] = item_data
     
     yield created
     
-    # Cleanup: попытка удалить объявление после теста
+    # Cleanup
     try:
         api_client.delete_item(created.get("id", ""))
     except Exception:
-        pass  # Игнорируем ошибки при удалении
+        pass
 
 
 @pytest.fixture
 def multiple_items(api_client: APIClient, unique_seller_id: int) -> Generator[List[Dict[str, Any]], None, None]:
-    """
-    Фикстура для создания нескольких объявлений одного продавца.
-    """
+    """Фикстура для создания нескольких объявлений одного продавца."""
     items = []
     
     for i in range(3):
